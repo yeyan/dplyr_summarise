@@ -1,6 +1,8 @@
 ---
 title: "dplyr summarise bug?"
-output: html_document
+output: 
+  html_document:
+    keep_md: true
 ---
 
 ```{r setup, include=FALSE}
@@ -52,7 +54,7 @@ For some reason the `process.time` is not calculated correctly, but supprisingly
 
 ### Using `group_by` and `do`
 
-```{r}
+```{r, message=TRUE}
 stats %>%
   group_by(implementation, message.size) %>%
   do(tibble(total.size=sum(.$message.size), 
