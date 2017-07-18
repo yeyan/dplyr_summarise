@@ -1,0 +1,67 @@
+---
+title: "dplyr summarise bug?"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, message=F}
+library(tidyverse)
+stats <- read_csv('stats.csv')
+```
+I am pretty sure that I got the same behaviour before I updated `Rcpp`.
+
+```{r}
+sessionInfo()
+```
+
+### Use `filter` and `invoke_map` to performance group aggregation
+
+```{r}
+test <- function(impl, size) {
+  stats %>%
+    filter(message.size==size & implementation==impl) %>%
+    select(ts.in, ts.out) %>%
+    summarise(begin=min(ts.in),
+              end=max(ts.out),
+              process.time=end - begin,
+              message.rate=size * 10000/as.double(process.time)/1024/1024)
+}
+
+invoke_map_df(test, crossing(impl=c('Camel', 'Spark'), size=c(1024, 1024*5, 1024*10)) %>% transpose())
+```
+
+### Using `group_by` and `summarise`
+
+```{r}
+stats %>%
+  group_by(implementation, message.size) %>%
+  summarise(total.size=sum(message.size), 
+            begin=min(ts.in), 
+            end=max(ts.out), 
+            duration=end-begin,
+            message.rate=total.size/as.numeric(duration)/1024/1024) %>%
+  ungroup() %>%
+  select(begin, end, duration, message.rate)
+```
+
+For some reason the `process.time` is not calculated correctly, but supprisingly `message.rate` which depends on it is correct! Did I do something wrong here?
+
+### Using `group_by` and `do`
+
+```{r}
+stats %>%
+  group_by(implementation, message.size) %>%
+  do(tibble(total.size=sum(.$message.size), 
+            begin=min(.$ts.in), 
+            end=max(.$ts.out), 
+            duration=end-begin,
+            message.rate=total.size/as.numeric(duration)/1024/1024)) %>%
+  ungroup() %>%
+  select(begin, end, duration, message.rate)
+```
+
+Do's behaviour matches `filter` and `invoke_map` combination.
